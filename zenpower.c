@@ -279,7 +279,26 @@ static int zenpower_read(struct device *dev, enum hwmon_sensor_types type,
 			if (channel == 0)
 				return -EOPNOTSUPP;
 			channel -= 1;	// hwmon_in have different indexing, see note at zenpower_info
-							// fall through
+
+			if (attr != hwmon_in_input && attr != hwmon_curr_input &&
+				attr != hwmon_power_input) {
+				return -EOPNOTSUPP;
+			}
+
+			switch (channel) {
+				case 0: // Core SVI2
+					data->read_amdsmn_addr(data->pdev, data->node_id, data->svi_core_addr, &plane);
+					break;
+				case 1: // SoC SVI2
+					data->read_amdsmn_addr(data->pdev, data->node_id, data->svi_soc_addr, &plane);
+					break;
+				default:
+					return -EOPNOTSUPP;
+			}
+
+			*val = plane_to_vcc(plane);
+			break;
+
 		// Power / Current
 		case hwmon_curr:
 		case hwmon_power:
@@ -302,9 +321,6 @@ static int zenpower_read(struct device *dev, enum hwmon_sensor_types type,
 			}
 
 			switch (type) {
-				case hwmon_in:
-					*val = plane_to_vcc(plane);
-					break;
 				case hwmon_curr:
 					*val = (channel == 0) ?
 						get_core_current(plane, data->zen2):
